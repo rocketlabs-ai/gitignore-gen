@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitIgnore Generator</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #f78166;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --tag-bg: #1f2937;
+    --tag-border: #374151;
+    --mono: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  header h1 span { color: var(--accent); }
+  header .badge {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    background: var(--accent2);
+    color: #000;
+    border-radius: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .main {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+  .panel-left {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-right {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .search-wrap {
+    position: relative;
+  }
+  .search-wrap input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px 8px 36px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap .icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    pointer-events: none;
+  }
+  .results-list {
+    max-height: 220px;
+    overflow-y: auto;
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface2);
+  }
+  .results-list:empty { display: none; }
+  .result-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+  }
+  .result-item:hover { background: var(--surface); }
+  .result-item .cat { font-size: 0.7rem; color: var(--text-muted); margin-left: auto; }
+  .result-item .check { color: var(--accent2); font-size: 0.8rem; }
+  .selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 32px;
+  }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 0.78rem;
+    cursor: default;
+  }
+  .tag .remove {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: color 0.1s;
+  }
+  .tag .remove:hover { color: var(--accent3); }
+  .combos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .combo-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .combo-btn:hover { border-color: var(--accent); background: var(--surface); }
+  .custom-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    overflow: hidden;
+  }
+  .custom-section textarea {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.6;
+    padding: 10px;
+    border-radius: 6px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.15s;
+    min-height: 100px;
+  }
+  .custom-section textarea:focus { border-color: var(--accent); }
+  .custom-section textarea::placeholder { color: var(--text-muted); }
+  .preview-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .preview-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .preview-title .filename {
+    color: var(--accent);
+    font-family: var(--mono);
+  }
+  .line-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--surface2);
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s, background 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-success { background: var(--accent2); color: #000; }
+  .btn.copied { background: var(--accent2) !important; }
+  .preview-body {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+  }
+  pre {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.7;
+    padding: 16px;
+    white-space: pre;
+    color: var(--text);
+  }
+  .line { display: block; }
+  .line-comment { color: #6e7681; }
+  .line-section { color: var(--accent); font-weight: 700; }
+  .line-pattern { color: #ffa657; }
+  .line-blank { color: transparent; user-select: none; }
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    color: var(--text-muted);
+    padding: 40px;
+    text-align: center;
+  }
+  .empty-state .icon-big { font-size: 3rem; opacity: 0.3; }
+  .empty-state p { font-size: 0.85rem; line-height: 1.6; }
+  footer {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  footer span { color: var(--accent); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  @media (max-width: 768px) {
+    .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .panel-left { border-right: none; border-bottom: 1px solid var(--border); max-height: 55vh; }
+    .panel-right { min-height: 40vh; }
+    .results-list { max-height: 150px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Git<span>Ignore</span></h1>
+  <span class="badge">Generator</span>
+</header>
+
+<div class="main">
+  <div class="panel-left">
+    <div class="section">
+      <div class="section-label">Search Technologies</div>
+      <div class="search-wrap">
+        <span class="icon">&#128269;</span>
+        <input type="text" id="searchInput" placeholder="node, python, react, rust..." autocomplete="off" spellcheck="false">
+      </div>
+      <div class="results-list" id="resultsList"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Selected (<span id="selectedCount">0</span>)</div>
+      <div class="selected-tags" id="selectedTags">
+        <span style="color:var(--text-muted);font-size:0.78rem">None selected — search above</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Quick Combos</div>
+      <div class="combos">
+        <button class="combo-btn" data-combo="node,react">Node + React</button>
+        <button class="combo-btn" data-combo="python,django">Python + Django</button>
+        <button class="combo-btn" data-combo="rust">Rust</button>
+        <button class="combo-btn" data-combo="go">Go</button>
+        <button class="combo-btn" data-combo="node,react,docker">Full Stack (Node+React+Docker)</button>
+        <button class="combo-btn" data-combo="java,maven">Java + Maven</button>
+        <button class="combo-btn" data-combo="python,flask">Python + Flask</button>
+        <button class="combo-btn" data-combo="swift,xcode">Swift + Xcode</button>
+        <button class="combo-btn" data-combo="unity,csharp">Unity + C#</button>
+        <button class="combo-btn" data-combo="node,express,mongodb">MEAN Stack</button>
+        <button class="combo-btn" data-combo="react,typescript">React + TypeScript</button>
+        <button class="combo-btn" data-combo="python,jupyter">Python + Jupyter</button>
+      </div>
+    </div>
+
+    <div class="custom-section">
+      <div class="section-label">Custom Rules</div>
+      <textarea id="customRules" placeholder="# Add your own patterns&#10;*.local&#10;.env.local&#10;my-secret-file.txt"></textarea>
+    </div>
+  </div>
+
+  <div class="panel-right">
+    <div class="preview-header">
+      <div class="preview-title">
+        Preview — <span class="filename">.gitignore</span>
+        <span class="line-count" id="lineCount">0 lines</span>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" id="copyBtn">&#128203; Copy</button>
+        <button class="btn btn-primary" id="downloadBtn">&#8595; Download</button>
+      </div>
+    </div>
+    <div class="preview-body" id="previewBody">
+      <div class="empty-state">
+        <div class="icon-big">&#128462;</div>
+        <p>Select one or more technologies from the left<br>to generate your .gitignore file.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>Built by <span>Rocket Labs AI</span></footer>
+
+<script>
+const TEMPLATES = {
+  node: {
+    label: 'Node.js',
+    category: 'JavaScript',
+    content: `# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm
+.yarn-integrity
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+package-lock.json.bak
+.node_repl_history
+*.tgz
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+dist/
+build/
+.cache/
+coverage/
+.nyc_output/`
+  },
+  react: {
+    label: 'React',
+    category: 'JavaScript',
+    content: `# React
+build/
+.eslintcache
+*.map
+.DS_Store
+Thumbs.db`
+  },
+  vue: {
+    label: 'Vue.js',
+    category: 'JavaScript',
+    content: `# Vue.js
+dist/
+.cache/
+node_modules/
+*.local
+.DS_Store
+Thumbs.db`
+  },
+  angular: {
+    label: 'Angular',
+    category: 'JavaScript',
+    content: `# Angular
+dist/
+.angular/
+node_modules/
+.sass-cache/
+connect.lock
+coverage/
+libpeerconnection.log
+npm-debug.log
+testem.log
+.DS_Store
+Thumbs.db`
+  },
+  nextjs: {
+    label: 'Next.js',
+    category: 'JavaScript',
+    content: `# Next.js
+.next/
+out/
+build/
+.vercel
+*.tsbuildinfo
+next-env.d.ts`
+  },
+  nuxt: {
+    label: 'Nuxt.js',
+    category: 'JavaScript',
+    content: `# Nuxt.js
+.nuxt/
+.output/
+dist/
+.nitro/
+.cache/
+node_modules/`
+  },
+  svelte: {
+    label: 'Svelte',
+    category: 'JavaScript',
+    content: `# Svelte
+.svelte-kit/
+build/
+node_modules/
+vite.config.js.timestamp-*`
+  },
+  typescript: {
+    label: 'TypeScript',
+    category: 'JavaScript',
+    content: `# TypeScript
+*.js.map
+*.d.ts
+!*.d.ts.map
+tsconfig.tsbuildinfo
+dist/
+out/`
+  },
+  python: {
+    label: 'Python',
+    category: 'Python',
+    content: `# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+*.mo
+*.pot
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+instance/
+.webassets-cache
+.scrapy
+docs/_build/
+.pybuilder/
+target/
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.spyderproject.cfg
+.spyproject
+.ropeproject
+/site
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+cython_debug/`
+  },
+  django: {
+    label: 'Django',
+    category: 'Python',
+    content: `# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+.env
+*.pyc`
+  },
+  flask: {
+    label: 'Flask',
+    category: 'Python',
+    content: `# Flask
+instance/
+.webassets-cache
+.env
+*.pyc
+__pycache__/`
+  },
+  fastapi: {
+    label: 'FastAPI',
+    category: 'Python',
+    content: `# FastAPI
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/`
+  },
+  jupyter: {
+    label: 'Jupyter',
+    category: 'Python',
+    content: `# Jupyter
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+profile_default/
+ipython_config.py
+__pycache__/`
+  },
+  rust: {
+    label: 'Rust',
+    category: 'Systems',
+    content: `# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb`
+  },
+  go: {
+    label: 'Go',
+    category: 'Systems',
+    content: `# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+vendor/`
+  },
+  cpp: {
+    label: 'C/C++',
+    category: 'Systems',
+    content: `# C / C++
+*.d
+*.slo
+*.lo
+*.o
+*.obj
+*.gch
+*.pch
+*.so
+*.dylib
+*.dll
+*.mod
+*.smod
+*.lai
+*.la
+*.a
+*.lib
+*.exe
+*.out
+*.app
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+build/
+*.cbp
+.cproject
+.settings/
+*.autosave`
+  },
+  csharp: {
+    label: 'C#',
+    category: 'Systems',
+    content: `# C#
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nupkg
+*.snupkg
+*.[Cc]ache
+!*.[Cc]ache/
+packages/
+!.nuget/packages/
+*.nuget.props
+*.nuget.targets
+csx/
+*.Build.props
+_i.c
+_vcclkdepend
+TestResult.xml
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+_cpprest_generated/`
+  },
+  java: {
+    label: 'Java',
+    category: 'JVM',
+    content: `# Java
+*.class
+*.log
+*.ctxt
+.mtj.tmp/
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+replay_pid*`
+  },
+  maven: {
+    label: 'Maven',
+    category: 'JVM',
+    content: `# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar`
+  },
+  gradle: {
+    label: 'Gradle',
+    category: 'JVM',
+    content: `# Gradle
+.gradle/
+**/build/
+!src/**/build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+.gradletasknamecache
+build/`
+  },
+  kotlin: {
+    label: 'Kotlin',
+    category: 'JVM',
+    content: `# Kotlin
+*.class
+.kotlin/
+build/
+out/
+*.kts.iml`
+  },
+  scala: {
+    label: 'Scala',
+    category: 'JVM',
+    content: `# Scala
+*.class
+*.log
+.cache
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+.ensime_cache/
+.ensime
+.scala_dependencies
+.worksheet`
+  },
+  swift: {
+    label: 'Swift',
+    category: 'Apple',
+    content: `# Swift
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+DerivedData/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+Carthage/Build/
+.build/
+*.resolved
+Pods/`
+  },
+  xcode: {
+    label: 'Xcode',
+    category: 'Apple',
+    content: `# Xcode
+xcuserdata/
+DerivedData/
+*.xccheckout
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xcscmblueprint
+build/
+*.ipa`
+  },
+  android: {
+    label: 'Android',
+    category: 'Mobile',
+    content: `# Android
+*.iml
+.gradle/
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties`
+  },
+  flutter: {
+    label: 'Flutter',
+    category: 'Mobile',
+    content: `# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+doc/api/
+*.iml
+*.log`
+  },
+  unity: {
+    label: 'Unity',
+    category: 'Game Dev',
+    content: `# Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emory[Cc]aptures/
+/[Rr]ecordings/
+/[Aa]ssets/Plugins/Editor/JetBrains*
+.DS_Store
+/[Aa]ssets/AssetStoreTools*
+/[Aa]ssets/Editor Default Resources.meta
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+/Packages/packages-lock.json
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+Assets/AddressableAssetsData/*/*.bin*
+Assets/StreamingAssets/aa.meta
+Assets/StreamingAssets/aa/*`
+  },
+  unreal: {
+    label: 'Unreal Engine',
+    category: 'Game Dev',
+    content: `# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.vscode/
+*.VC.db
+*.opensdf
+*.opendb
+*.sdf
+*.sln
+*.suo
+*.xcworkspace
+*.xcuserdata/`
+  },
+  docker: {
+    label: 'Docker',
+    category: 'DevOps',
+    content: `# Docker
+.dockerignore
+docker-compose.override.yml
+.env
+.env.*
+!.env.example`
+  },
+  terraform: {
+    label: 'Terraform',
+    category: 'DevOps',
+    content: `# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc`
+  },
+  ansible: {
+    label: 'Ansible',
+    category: 'DevOps',
+    content: `# Ansible
+*.retry
+.vault_pass
+vault-password-file`
+  },
+  kubernetes: {
+    label: 'Kubernetes',
+    category: 'DevOps',
+    content: `# Kubernetes
+kubeconfig
+*.kubeconfig
+secrets.yaml
+secrets.yml`
+  },
+  linux: {
+    label: 'Linux',
+    category: 'OS',
+    content: `# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*`
+  },
+  macos: {
+    label: 'macOS',
+    category: 'OS',
+    content: `# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk`
+  },
+  windows: {
+    label: 'Windows',
+    category: 'OS',
+    content: `# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk`
+  },
+  vscode: {
+    label: 'VS Code',
+    category: 'IDE',
+    content: `# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix`
+  },
+  jetbrains: {
+    label: 'JetBrains',
+    category: 'IDE',
+    content: `# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/`
+  },
+  vim: {
+    label: 'Vim',
+    category: 'IDE',
+    content: `# Vim
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+*~
+tags
+[._]*.un~`
+  },
+  emacs: {
+    label: 'Emacs',
+    category: 'IDE',
+    content: `# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+.org-id-locations
+*_archive
+*_flymake.*
+/eshell/history
+/eshell/lastdir
+/elpa/
+*.rel
+/auto/
+.cask/
+dist/
+flycheck_*.el
+/server/
+.projectile
+.dir-locals.el
+/network-security.data`
+  },
+  ruby: {
+    label: 'Ruby',
+    category: 'Backend',
+    content: `# Ruby
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+.byebug_history
+.datamapper
+rerun.txt
+pickle-email-*.html
+.bundle/
+vendor/bundle
+lib/bundler/man/
+.rvmrc`
+  },
+  rails: {
+    label: 'Rails',
+    category: 'Backend',
+    content: `# Rails
+*.rbc
+capybara-*.html
+.rspec
+/db/*.sqlite3
+/db/*.sqlite3-journal
+/db/*.sqlite3-shm
+/db/*.sqlite3-wal
+/public/system
+/coverage/
+/spec/tmp
+**.orig
+rerun.txt
+pickle-email-*.html
+config/initializers/secret_token.rb
+config/master.key
+/public/packs
+/public/assets
+node_modules
+yarn-error.log
+.byebug_history
+.env
+storage/
+/tmp`
+  },
+  php: {
+    label: 'PHP',
+    category: 'Backend',
+    content: `# PHP
+vendor/
+composer.phar
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+.DS_Store`
+  },
+  laravel: {
+    label: 'Laravel',
+    category: 'Backend',
+    content: `# Laravel
+/vendor/
+node_modules/
+npm-debug.log
+yarn-error.log
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+.DS_Store
+storage/*.key
+public/hot
+public/storage
+.vapor`
+  },
+  dotnet: {
+    label: '.NET',
+    category: 'Backend',
+    content: `# .NET
+*.user
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+.vs/
+packages/
+*.nupkg
+*.snupkg
+project.lock.json
+*.nuget.props
+*.nuget.targets`
+  },
+  elixir: {
+    label: 'Elixir',
+    category: 'Backend',
+    content: `# Elixir
+/_build/
+/cover/
+/deps/
+/doc/
+/.fetch
+erl_crash.dump
+*.ez
+*.beam
+/config/*.secret.exs
+.elixir_ls/`
+  },
+  haskell: {
+    label: 'Haskell',
+    category: 'Backend',
+    content: `# Haskell
+dist/
+dist-newstyle/
+cabal-dev
+*.o
+*.hi
+*.hie
+*.chi
+*.chs.h
+*.dyn_o
+*.dyn_hi
+.hpc
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+*.prof
+*.aux
+*.hp
+*.eventlog
+.stack-work/
+cabal.project.local
+cabal.project.local~
+.HTF/
+.ghc.environment.*`
+  },
+  mongodb: {
+    label: 'MongoDB',
+    category: 'Database',
+    content: `# MongoDB
+mongod.lock
+/data/db/
+*.pid`
+  },
+  postgres: {
+    label: 'PostgreSQL',
+    category: 'Database',
+    content: `# PostgreSQL
+*.sql.gz
+*.dump
+pg_hba.conf
+pg_ident.conf
+postgresql.conf`
+  },
+  env: {
+    label: 'Environment / Secrets',
+    category: 'Security',
+    content: `# Environment & Secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.cert
+*.pfx
+*.p12
+.secret
+secrets/
+credentials/
+*.credentials`
+  },
+  logs: {
+    label: 'Logs',
+    category: 'General',
+    content: `# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*`
+  },
+  archives: {
+    label: 'Archives',
+    category: 'General',
+    content: `# Archives
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.bz2
+*.gz`
+  },
+  sass: {
+    label: 'Sass/SCSS',
+    category: 'Frontend',
+    content: `# Sass
+.sass-cache/
+*.css.map
+*.sass.map
+*.scss.map`
+  },
+  webpack: {
+    label: 'Webpack',
+    category: 'Frontend',
+    content: `# Webpack
+dist/
+.cache/
+stats.json`
+  },
+  vite: {
+    label: 'Vite',
+    category: 'Frontend',
+    content: `# Vite
+dist/
+dist-ssr/
+*.local
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*`
+  },
+  electron: {
+    label: 'Electron',
+    category: 'Frontend',
+    content: `# Electron
+out/
+dist/
+node_modules/
+.webpack/
+release/builds/`
+  },
+  storybook: {
+    label: 'Storybook',
+    category: 'Frontend',
+    content: `# Storybook
+storybook-static/
+.storybook/build/`
+  },
+  solana: {
+    label: 'Solana',
+    category: 'Web3',
+    content: `# Solana / Anchor
+target/
+.anchor/
+app/node_modules/
+test-ledger/
+wallet.json`
+  },
+  hardhat: {
+    label: 'Hardhat',
+    category: 'Web3',
+    content: `# Hardhat
+cache/
+artifacts/
+typechain/
+typechain-types/
+node_modules/
+coverage/
+coverage.json`
+  }
+};
+
+const COMBOS = {
+  'node,react': ['node', 'react'],
+  'python,django': ['python', 'django'],
+  'rust': ['rust'],
+  'go': ['go'],
+  'node,react,docker': ['node', 'react', 'docker'],
+  'java,maven': ['java', 'maven'],
+  'python,flask': ['python', 'flask'],
+  'swift,xcode': ['swift', 'xcode'],
+  'unity,csharp': ['unity', 'csharp'],
+  'node,express,mongodb': ['node', 'mongodb'],
+  'react,typescript': ['react', 'typescript'],
+  'python,jupyter': ['python', 'jupyter']
+};
+
+let selected = new Set();
+let searchQuery = '';
+
+const searchInput = document.getElementById('searchInput');
+const resultsList = document.getElementById('resultsList');
+const selectedTags = document.getElementById('selectedTags');
+const selectedCount = document.getElementById('selectedCount');
+const previewBody = document.getElementById('previewBody');
+const lineCount = document.getElementById('lineCount');
+const copyBtn = document.getElementById('copyBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const customRules = document.getElementById('customRules');
+
+function fuzzyMatch(str, query) {
+  if (!query) return true;
+  const s = str.toLowerCase();
+  const q = query.toLowerCase().trim();
+  if (s.includes(q)) return true;
+  let qi = 0;
+  for (let i = 0; i < s.length && qi < q.length; i++) {
+    if (s[i] === q[qi]) qi++;
+  }
+  return qi === q.length;
+}
+
+function renderSearch(query) {
+  resultsList.innerHTML = '';
+  const keys = Object.keys(TEMPLATES);
+  const results = keys.filter(k =>
+    fuzzyMatch(TEMPLATES[k].label, query) ||
+    fuzzyMatch(k, query) ||
+    fuzzyMatch(TEMPLATES[k].category, query)
+  );
+  if (!query || results.length === 0) {
+    if (!query) {
+      results.splice(0);
+      keys.forEach(k => results.push(k));
+    }
+  }
+  results.slice(0, 20).forEach(k => {
+    const t = TEMPLATES[k];
+    const div = document.createElement('div');
+    div.className = 'result-item';
+    const isSelected = selected.has(k);
+    div.innerHTML = `
+      ${isSelected ? '<span class="check">&#10003;</span>' : ''}
+      <span>${t.label}</span>
+      <span class="cat">${t.category}</span>
+    `;
+    div.addEventListener('click', () => {
+      if (selected.has(k)) selected.delete(k);
+      else selected.add(k);
+      renderSearch(searchQuery);
+      renderTags();
+      renderPreview();
+    });
+    resultsList.appendChild(div);
+  });
+}
+
+function renderTags() {
+  selectedCount.textContent = selected.size;
+  if (selected.size === 0) {
+    selectedTags.innerHTML = '<span style="color:var(--text-muted);font-size:0.78rem">None selected — search above</span>';
+    return;
+  }
+  selectedTags.innerHTML = '';
+  selected.forEach(k => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = `${TEMPLATES[k].label} <span class="remove" data-key="${k}">&#10005;</span>`;
+    tag.querySelector('.remove').addEventListener('click', (e) => {
+      selected.delete(e.target.dataset.key);
+      renderSearch(searchQuery);
+      renderTags();
+      renderPreview();
+    });
+    selectedTags.appendChild(tag);
+  });
+}
+
+function buildContent() {
+  if (selected.size === 0 && !customRules.value.trim()) return '';
+  const header = `# .gitignore — Generated by GitIgnore Generator
+# https://rocketlabs.ai
+# Generated: ${new Date().toISOString().split('T')[0]}
+
+`;
+  const parts = [];
+  selected.forEach(k => {
+    parts.push(TEMPLATES[k].content.trim());
+  });
+  let combined = header + parts.join('\n\n');
+  const custom = customRules.value.trim();
+  if (custom) {
+    combined += '\n\n# Custom Rules\n' + custom;
+  }
+  return combined;
+}
+
+function colorLine(line) {
+  if (line === '') return `<span class="line line-blank"> </span>`;
+  if (line.startsWith('##') || (line.startsWith('#') && line.includes('---'))) {
+    return `<span class="line line-section">${escHtml(line)}</span>`;
+  }
+  if (line.startsWith('#')) return `<span class="line line-comment">${escHtml(line)}</span>`;
+  return `<span class="line line-pattern">${escHtml(line)}</span>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderPreview() {
+  const content = buildContent();
+  if (!content) {
+    previewBody.innerHTML = `<div class="empty-state">
+      <div class="icon-big">&#128462;</div>
+      <p>Select one or more technologies from the left<br>to generate your .gitignore file.</p>
+    </div>`;
+    lineCount.textContent = '0 lines';
+    return;
+  }
+  const lines = content.split('\n');
+  lineCount.textContent = `${lines.length} lines`;
+  const html = lines.map(colorLine).join('\n');
+  previewBody.innerHTML = `<pre>${html}</pre>`;
+}
+
+searchInput.addEventListener('input', (e) => {
+  searchQuery = e.target.value;
+  renderSearch(searchQuery);
+});
+
+searchInput.addEventListener('focus', () => {
+  renderSearch(searchQuery);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap') && !e.target.closest('.results-list')) {
+    resultsList.innerHTML = '';
+  }
+});
+
+document.querySelectorAll('.combo-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const keys = COMBOS[btn.dataset.combo] || [];
+    keys.forEach(k => selected.add(k));
+    renderTags();
+    renderPreview();
+  });
+});
+
+copyBtn.addEventListener('click', () => {
+  const content = buildContent();
+  if (!content) return;
+  navigator.clipboard.writeText(content).then(() => {
+    copyBtn.textContent = '✓ Copied!';
+    copyBtn.classList.add('copied');
+    setTimeout(() => {
+      copyBtn.innerHTML = '&#128203; Copy';
+      copyBtn.classList.remove('copied');
+    }, 2000);
+  });
+});
+
+downloadBtn.addEventListener('click', () => {
+  const content = buildContent();
+  if (!content) return;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '.gitignore';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+customRules.addEventListener('input', renderPreview);
+
+renderPreview();
+</script>
+</body>
+</html>
